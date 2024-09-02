@@ -63,7 +63,7 @@ jobs:
     - name: Trigger Static Site Workflow
       uses: peter-evans/repository-dispatch@v3
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}  # Use GITHUB_TOKEN
+        token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # Use PAT for cross-repository dispatch
         repository: mrcloudchase/crc-static-site-code
         event-type: infra-deployment-success
         client-payload: '{"resource_group_name": "${{ secrets.RESOURCE_GROUP_NAME }}", "storage_account_name": "${{ steps.deploy_storage.outputs.storageAccountName }}"}'
