@@ -46,7 +46,8 @@ jobs:
           --location ${{ secrets.RESOURCE_GROUP_LOCATION }} \
           --name rg-deployment \
           --template-file infra/rg.bicep \
-          --parameters resourceGroupLocation=${{ secrets.RESOURCE_GROUP_LOCATION }} resourceGroupName=${{ secrets.RESOURCE_GROUP_NAME }}
+          --parameters resourceGroupLocation=${{ secrets.RESOURCE_GROUP_LOCATION }} resourceGroupName=${{ secrets.RESOURCE_GROUP_NAME }} \
+          --query "properties.outputs.storageAccountName.value" -o tsv
 
     # Deploy Storage Account using storage.bicep only if the resource group exists
     - name: Deploy Storage Account
@@ -55,8 +56,9 @@ jobs:
         az deployment group create \
           --resource-group ${{ secrets.RESOURCE_GROUP_NAME }} \
           --name crc-static-site-deployment \
-          --template-file infra/storage.bicep
-
+          --template-file infra/storage.bicep \
+          --query "properties.outputs.storageAccountName.value" -o tsv
+        
     # Trigger the crc-static-site-code workflow on successful deployment of infrastructure
     - name: Trigger Static Site Workflow
       uses: peter-evans/repository-dispatch@v3
@@ -64,3 +66,4 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}  # Use GITHUB_TOKEN
         repository: mrcloudchase/crc-static-site-code
         event-type: infra-deployment-success
+        client-payload: '{"resource_group_name": "${{ secrets.RESOURCE_GROUP_NAME }}", "storage_account_name": "${{ steps.deploy_storage.outputs.storageAccountName }}"}'
