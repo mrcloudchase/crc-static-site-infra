@@ -41,6 +41,7 @@ jobs:
           --parameters resourceGroupLocation=${{ secrets.RESOURCE_GROUP_LOCATION }} resourceGroupName=${{ secrets.RESOURCE_GROUP_NAME }}
 
     - name: Deploy Storage Account
+      if: steps.check_rg.outputs.rg_exists == 'true'
       run: |
         az deployment group create \
           --resource-group ${{ secrets.RESOURCE_GROUP_NAME }} \
@@ -51,5 +52,5 @@ jobs:
       uses: peter-evans/repository-dispatch@v1
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        repository: your-username/crc-static-site-code
+        repository: mrcloudchase/crc-static-site-code
         event-type: infra-deployment-success
