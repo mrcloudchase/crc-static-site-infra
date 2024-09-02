@@ -1,22 +1,28 @@
 name: Deploy Infrastructure
 
+# Trigger the workflow on push to main branch
 on:
   push:
     branches:
       - main
 
+# Define permissions for the workflow
 permissions:
-  id-token: write
-  contents: read
+  id-token: write # Ensure 'id-token' permissions are set to 'write' for checking out code
+  contents: write # Ensure 'contents' permissions are set to 'write' for checking out code
+  actions: write  # Ensure 'actions' permissions are set to 'write' for triggering workflows
 
+# Define the jobs for the workflow
 jobs:
   deploy-infra:
     runs-on: ubuntu-latest
 
+    # Check out the code
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
+    
+    # Log in to Azure using Federated Identity Credentials using secrets
     - name: Log in to Azure using Federated Identity Credentials
       uses: azure/login@v2
       with:
@@ -24,6 +30,7 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+    # Check if the resource group exists
     - name: Check if Resource Group Exists
       id: check_rg
       run: |
@@ -31,6 +38,7 @@ jobs:
         echo "Resource Group exists: $RG_EXISTS"
         echo "rg_exists=$RG_EXISTS" >> $GITHUB_OUTPUT
 
+    # Create Resource Group if it does not exist using rg.bicep, which deploys storage.bicep as module
     - name: Create Resource Group if it does not exist
       if: steps.check_rg.outputs.rg_exists == 'false'
       run: |
@@ -40,6 +48,7 @@ jobs:
           --template-file infra/rg.bicep \
           --parameters resourceGroupLocation=${{ secrets.RESOURCE_GROUP_LOCATION }} resourceGroupName=${{ secrets.RESOURCE_GROUP_NAME }}
 
+    # Deploy Storage Account using storage.bicep only if the resource group exists
     - name: Deploy Storage Account
       if: steps.check_rg.outputs.rg_exists == 'true'
       run: |
@@ -48,9 +57,10 @@ jobs:
           --name crc-static-site-deployment \
           --template-file infra/storage.bicep
 
+    # Trigger the crc-static-site-code workflow on successful deployment of infrastructure
     - name: Trigger Static Site Workflow
-      uses: peter-evans/repository-dispatch@v1
+      uses: peter-evans/repository-dispatch@v3
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}  # Use GITHUB_TOKEN
         repository: mrcloudchase/crc-static-site-code
         event-type: infra-deployment-success
