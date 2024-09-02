@@ -37,7 +37,8 @@ jobs:
         az deployment sub create \
           --location ${{ secrets.RESOURCE_GROUP_LOCATION }} \
           --name rg-deployment \
-          --template-file infra/rg.bicep
+          --template-file infra/rg.bicep \
+          --parameters resourceGroupLocation=${{ secrets.RESOURCE_GROUP_LOCATION }} resourceGroupName=${{ secrets.RESOURCE_GROUP_NAME }}
 
     - name: Deploy Storage Account
       run: |
