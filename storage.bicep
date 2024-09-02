@@ -10,7 +10,7 @@
   'Standard_ZRS'
 ])
 
-param storageAccountType string = 'Standard_LRS'
+param storageAccountType string = 'Standard_GRS'
 
 // @description('The name of the resource group.')
 // param resourceGroupName string
