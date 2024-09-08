@@ -51,6 +51,7 @@ jobs:
 
     # Deploy Storage Account using storage.bicep only if the resource group exists
     - name: Deploy Storage Account
+      id: deploy_storage  # Add an ID to the step
       if: steps.check_rg.outputs.rg_exists == 'true'
       run: |
         az deployment group create \
