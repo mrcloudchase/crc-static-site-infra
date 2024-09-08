@@ -1,28 +1,23 @@
 name: Deploy Infrastructure
 
-# Trigger the workflow on push to main branch
 on:
   push:
     branches:
       - main
 
-# Define permissions for the workflow
 permissions:
-  id-token: write # Ensure 'id-token' permissions are set to 'write' for checking out code
-  contents: write # Ensure 'contents' permissions are set to 'write' for checking out code
-  actions: write  # Ensure 'actions' permissions are set to 'write' for triggering workflows
+  id-token: write
+  contents: write
+  actions: write
 
-# Define the jobs for the workflow
 jobs:
   deploy-infra:
     runs-on: ubuntu-latest
 
-    # Check out the code
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
-    # Log in to Azure using Federated Identity Credentials using secrets
+
     - name: Log in to Azure using Federated Identity Credentials
       uses: azure/login@v2
       with:
@@ -30,7 +25,6 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    # Check if the resource group exists
     - name: Check if Resource Group Exists
       id: check_rg
       run: |
@@ -38,41 +32,49 @@ jobs:
         echo "Resource Group exists: $RG_EXISTS"
         echo "rg_exists=$RG_EXISTS" >> $GITHUB_OUTPUT
 
-    # Create Resource Group if it does not exist using rg.bicep, which deploys storage.bicep as module
+    # Create Resource Group if it does not exist and capture the output
     - name: Create Resource Group if it does not exist
+      id: create_rg
       if: steps.check_rg.outputs.rg_exists == 'false'
       run: |
-        az deployment sub create \
+        RESOURCE_GROUP_NAME=$(az deployment sub create \
           --location ${{ secrets.RESOURCE_GROUP_LOCATION }} \
           --name rg-deployment \
           --template-file infra/rg.bicep \
           --parameters resourceGroupLocation=${{ secrets.RESOURCE_GROUP_LOCATION }} resourceGroupName=${{ secrets.RESOURCE_GROUP_NAME }} \
-          --query "properties.outputs.storageAccountName.value" -o tsv
+          --query "properties.outputs.resourceGroupName.value" -o tsv)
+        echo "resource_group_name=$RESOURCE_GROUP_NAME" >> $GITHUB_OUTPUT
 
-    # Deploy Storage Account using storage.bicep only if the resource group exists
+    # Deploy Storage Account and capture the storage account name
     - name: Deploy Storage Account
-      id: deploy_storage  # Add an ID to the step
+      id: deploy_storage
       if: steps.check_rg.outputs.rg_exists == 'true'
       run: |
-        az deployment group create \
+        STORAGE_ACCOUNT_NAME=$(az deployment group create \
           --resource-group ${{ secrets.RESOURCE_GROUP_NAME }} \
           --name crc-static-site-deployment \
           --template-file infra/storage.bicep \
-          --query "properties.outputs.storageAccountName.value" -o tsv
-        
-    # Trigger the crc-static-site-code workflow on successful deployment of infrastructure
+          --query "properties.outputs.storageAccountName.value" -o tsv)
+        echo "storage_account_name=$STORAGE_ACCOUNT_NAME" >> $GITHUB_OUTPUT
+
+    # Debugging: Output the Storage Account and Resource Group Name
+    - name: Debug Outputs
+      run: |
+        echo "Storage Account Name: ${{ steps.deploy_storage.outputs.storage_account_name }}"
+        echo "Resource Group Name: ${{ steps.create_rg.outputs.resource_group_name }}"
+        if [[ -z "${{ steps.deploy_storage.outputs.storage_account_name }}" ]]; then
+          echo "ERROR: Storage account name is empty!"
+          exit 1
+        fi
+        echo "Successfully retrieved storage account name: ${{ steps.deploy_storage.outputs.storage_account_name }}"
+        echo "Successfully retrieved resource group name: ${{ steps.create_rg.outputs.resource_group_name }}"
+
+    # Trigger the crc-static-site-code workflow with both resource group and storage account name
     - name: Trigger Static Site Workflow
       uses: peter-evans/repository-dispatch@v3
       with:
-        token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # Use PAT for cross-repository dispatch
+        token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         repository: mrcloudchase/crc-static-site-code
         event-type: infra-deployment-success
-        client-payload: '{"resource_group_name": "${{ secrets.RESOURCE_GROUP_NAME }}", "storage_account_name": "${{ steps.deploy_storage.outputs.storageAccountName }}"}'
-
-    # Output the storage account name and resource group name where the storage account is deployed
-    - name: Output Storage Account Name
-      run: |
-        echo "Storage Account Name: ${{ steps.deploy_storage.outputs.storageAccountName }}"
-        echo "Resource Group Name: ${{ secrets.RESOURCE_GROUP_NAME }}"
-        echo "storage_account_name=${{ steps.deploy_storage.outputs.storageAccountName }}" >> $GITHUB_OUTPUT
-        echo "resource_group_name=${{ secrets.RESOURCE_GROUP_NAME }}" >> $GITHUB_OUTPUT
+        client-payload: '{"resource_group_name": "${{ steps.create_rg.outputs.resource_group_name }}", "storage_account_name": "${{ steps.deploy_storage.outputs.storage_account_name }}"}'
+        
