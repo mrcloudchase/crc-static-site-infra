@@ -68,3 +68,11 @@ jobs:
         repository: mrcloudchase/crc-static-site-code
         event-type: infra-deployment-success
         client-payload: '{"resource_group_name": "${{ secrets.RESOURCE_GROUP_NAME }}", "storage_account_name": "${{ steps.deploy_storage.outputs.storageAccountName }}"}'
+
+    # Output the storage account name and resource group name where the storage account is deployed
+    - name: Output Storage Account Name
+      run: |
+        echo "Storage Account Name: ${{ steps.deploy_storage.outputs.storageAccountName }}"
+        echo "Resource Group Name: ${{ secrets.RESOURCE_GROUP_NAME }}"
+        echo "storage_account_name=${{ steps.deploy_storage.outputs.storageAccountName }}" >> $GITHUB_OUTPUT
+        echo "resource_group_name=${{ secrets.RESOURCE_GROUP_NAME }}" >> $GITHUB_OUTPUT
